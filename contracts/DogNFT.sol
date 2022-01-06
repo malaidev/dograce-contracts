@@ -15,6 +15,7 @@ contract DogNFT is ERC721 {
     uint256 weight;
     uint256 stamina;
     uint256 health;
+    uint256 luck;
   }
 
   struct StaminaRecord {
@@ -23,10 +24,13 @@ contract DogNFT is ERC721 {
   }
 
   FoodNFT public food;
+  mapping(uint256 => DogLib.extraTrait) public extraTrait;
 
   Counters.Counter private _tokenIdCounter;
 
-  mapping(uint256 => DogLib.DogInfo) public dogs;
+  mapping(uint256 => DogLib.DogTrait) public dogTrait;
+  mapping(uint256 => DogLib.DogBaseInfo) public dogBase;
+  mapping(uint256 => DogLib.DogBreedInfo) public dogBreed;
   mapping(uint256 => oldDogInfo) public oldInfo;
   mapping(uint256 => StaminaRecord) public staminas;
   mapping(uint256 => bool) public istraining;   //Is this dog training now?
@@ -38,12 +42,24 @@ contract DogNFT is ERC721 {
     
   }
 
-  function mint(address _to, DogLib.DogInfo memory info) public {
+  function mint(address _to,
+      DogLib.DogTrait memory _trait, 
+      DogLib.DogBaseInfo memory _base, 
+      DogLib.DogBreedInfo memory _breed) public {
 
       uint256 _newDogId = _tokenIdCounter.current();
       _safeMint(_to, _newDogId);
 
-      dogs[_newDogId] = info;
+      dogTrait[_newDogId] = _trait;
+      dogBase[_newDogId] = _base;
+      dogBreed[_newDogId] = _breed;
+
+      oldInfo[_newDogId].agility = _trait.agility;
+      oldInfo[_newDogId].stamina = _trait.stamina;
+      oldInfo[_newDogId].health = _trait.health;
+      oldInfo[_newDogId].weight = _trait.weight;
+      oldInfo[_newDogId].luck = _trait.luck;
+
       istraining[_newDogId] = false;
       isillegal[_newDogId] = false;
       trainField[_newDogId] = false;
@@ -53,14 +69,38 @@ contract DogNFT is ERC721 {
   function feed(uint256 dogID, uint256 foodID, uint256 amount) public {
 
     require(food.balanceOf(msg.sender, foodID) >= amount, "You havn't got enough food!");
-    require(!istraining[dogID], "Your dog is training now");
+    require(!istraining[dogID] || foodID == 3, "Your dog is training now");
 
-    uint256 extraStamina = food.getFoodStamina(foodID);
-    uint256 extraWeight = food.getFoodWeight(foodID);
+    extraTrait[dogID].stamina = food.getFoodStamina(foodID, amount);
+    extraTrait[dogID].agility = food.getFoodAgility(foodID, amount);
+    extraTrait[dogID].luck = food.getFoodLuck(foodID, amount);
+    extraTrait[dogID].weight = food.getFoodWeight(foodID, amount);
+    extraTrait[dogID].trainSuccessRate = food.getFoodTrainSuccessRate(foodID, amount);
 
-    dogs[dogID].stamina = dogs[dogID].stamina + extraStamina * amount;
-    dogs[dogID].weight = dogs[dogID].weight + extraWeight * amount;
 
+    oldInfo[dogID].agility = dogTrait[dogID].agility;
+    oldInfo[dogID].weight = dogTrait[dogID].weight;
+    oldInfo[dogID].health = dogTrait[dogID].health;
+    oldInfo[dogID].stamina = dogTrait[dogID].stamina;
+    oldInfo[dogID].luck = dogTrait[dogID].luck;
+
+    dogTrait[dogID].stamina = dogTrait[dogID].stamina + extraTrait[dogID].stamina;
+    dogTrait[dogID].weight = dogTrait[dogID].weight + extraTrait[dogID].weight;
+    dogTrait[dogID].agility = dogTrait[dogID].agility + extraTrait[dogID].agility;
+    dogTrait[dogID].luck = dogTrait[dogID].luck + extraTrait[dogID].luck;
+
+  }
+
+  function setDefault(uint256 dogID) public {
+    dogTrait[dogID].agility = oldInfo[dogID].agility;
+    dogTrait[dogID].weight = oldInfo[dogID].weight;
+    dogTrait[dogID].health = oldInfo[dogID].health;
+    dogTrait[dogID].stamina = oldInfo[dogID].stamina;
+    extraTrait[dogID].stamina = 0;
+    extraTrait[dogID].agility = 0;
+    extraTrait[dogID].luck = 0;
+    extraTrait[dogID].weight = 0;
+    extraTrait[dogID].trainSuccessRate = 0;
   }
 
   function startTrain(uint256 dogID, uint256 trainType) public {
@@ -68,34 +108,34 @@ contract DogNFT is ERC721 {
     require(isillegal[dogID] == false || trainField[dogID] == true, "You can not enter to the train field!");
     require(!istraining[dogID], "Your dog is training now!");
 
-    oldInfo[dogID].agility = dogs[dogID].agility;
-    oldInfo[dogID].weight = dogs[dogID].weight;
-    oldInfo[dogID].health = dogs[dogID].health;
-    oldInfo[dogID].stamina = dogs[dogID].stamina;
+    oldInfo[dogID].agility = dogTrait[dogID].agility;
+    oldInfo[dogID].weight = dogTrait[dogID].weight;
+    oldInfo[dogID].health = dogTrait[dogID].health;
+    oldInfo[dogID].stamina = dogTrait[dogID].stamina;
 
     istraining[dogID] = true;
 
     if(trainType == 0) {    //train
-      require(dogs[dogID].stamina >= 20, "Not enough stamina");
-      if(DogLib.chance(80)) {
-        dogs[dogID].agility = dogs[dogID].agility + 2;
-        dogs[dogID].weight = dogs[dogID].weight - 1;
+      require(dogTrait[dogID].stamina >= 20, "Not enough stamina");
+      if(DogLib.chance(80+extraTrait[dogID].trainSuccessRate)) {
+        dogTrait[dogID].agility = dogTrait[dogID].agility + 2;
+        dogTrait[dogID].weight = dogTrait[dogID].weight - 1;
       }
     }
 
     else if(trainType == 1) {
-      require(dogs[dogID].stamina >= 20, "Not enough stamina");
-      if(DogLib.chance(70)) {
-        dogs[dogID].agility = dogs[dogID].agility + 3;
-        dogs[dogID].weight = dogs[dogID].weight - 1;
+      require(dogTrait[dogID].stamina >= 20, "Not enough stamina");
+      if(DogLib.chance(70+extraTrait[dogID].trainSuccessRate)) {
+        dogTrait[dogID].agility = dogTrait[dogID].agility + 3;
+        dogTrait[dogID].weight = dogTrait[dogID].weight - 1;
       }
     }
 
     else {
-      require(dogs[dogID].stamina >= 20, "Not enough stamina");
-      if(DogLib.chance(50)) {
-        dogs[dogID].agility = dogs[dogID].agility + 5;
-        dogs[dogID].weight = dogs[dogID].weight - 2;
+      require(dogTrait[dogID].stamina >= 20, "Not enough stamina");
+      if(DogLib.chance(50+extraTrait[dogID].trainSuccessRate)) {
+        dogTrait[dogID].agility = dogTrait[dogID].agility + 5;
+        dogTrait[dogID].weight = dogTrait[dogID].weight - 2;
       }
     }
 
@@ -104,33 +144,43 @@ contract DogNFT is ERC721 {
   function endTrain(uint256 dogID) public {
     istraining[dogID] = false;
 
-    oldInfo[dogID].agility = dogs[dogID].agility;
-    oldInfo[dogID].weight = dogs[dogID].weight;
-    oldInfo[dogID].health = dogs[dogID].health;
-    oldInfo[dogID].stamina = dogs[dogID].stamina;
+    oldInfo[dogID].agility = dogTrait[dogID].agility;
+    oldInfo[dogID].weight = dogTrait[dogID].weight;
+    oldInfo[dogID].health = dogTrait[dogID].health;
+    oldInfo[dogID].stamina = dogTrait[dogID].stamina;
   }
 
 
   function heal(uint256 dogID) public {
-    dogs[dogID].health = 100;
-    oldInfo[dogID].health = dogs[dogID].health;
+    dogTrait[dogID].health = 100;
+    oldInfo[dogID].health = dogTrait[dogID].health;
   }
 
-  function getDogInfo(uint256 dogID) public view returns(DogLib.DogInfo memory) {
-    DogLib.DogInfo memory dogInfo;
-    dogInfo.gender = dogs[dogID].gender;
-    dogInfo.name = dogs[dogID].name;
-
-    dogInfo.parent0 = dogs[dogID].parent0;
-    dogInfo.parent1 = dogs[dogID].parent1;
-    dogInfo.stamina = oldInfo[dogID].stamina;
-    dogInfo.weight = oldInfo[dogID].weight;
-    dogInfo.agility = oldInfo[dogID].agility;
-    dogInfo.health = oldInfo[dogID].health;
-    // istraining = dogs[dogID].istraining;
-    // dogInfo.isillegal = dogs[dogID].isillegal;
-    dogInfo.luck = dogs[dogID].luck;
-
-    return dogInfo;
+  function getDogStamina(uint256 dogID) public view returns(uint256) {
+    return dogTrait[dogID].stamina;
   }
+
+  function getDogTrait(uint256 dogID) public view returns(DogLib.DogTrait memory) {
+    return dogTrait[dogID];
+  }
+
+  function decreaseHealth(uint256 dogID) public {
+    dogTrait[dogID].health = dogTrait[dogID].health - 10;
+  }
+
+  // function getDogInfo(uint256 dogID) public view returns(DogLib.DogInfo memory) {
+  //   DogLib.DogInfo memory dogInfo;
+  //   dogInfo.gender = dogs[dogID].gender;
+  //   dogInfo.name = dogs[dogID].name;
+
+  //   dogInfo.parent0 = dogs[dogID].parent0;
+  //   dogInfo.parent1 = dogs[dogID].parent1;
+  //   dogInfo.stamina = oldInfo[dogID].stamina;
+  //   dogInfo.weight = oldInfo[dogID].weight;
+  //   dogInfo.agility = oldInfo[dogID].agility;
+  //   dogInfo.health = oldInfo[dogID].health;
+  //   dogInfo.luck = dogs[dogID].luck;
+
+  //   return dogInfo;
+  // }
 }
