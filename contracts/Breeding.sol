@@ -12,60 +12,79 @@ contract Breeding {
   }
 
   DogNFT public dog;
+  mapping(uint256 => bool) public isBreeding;
+  mapping(uint256 => uint256) public breedEnded;
 
-  function babyMake(DogLib.DogInfo memory male, DogLib.DogInfo memory female, string memory name, uint256 id) public {
+  function babyMake(
+    uint256 maleID,
+    uint256 femaleID,
+    DogLib.DogBaseInfo memory maleBase,
+      DogLib.DogBaseInfo memory femaleBase,
+      DogLib.DogTrait memory maleTrait,
+      DogLib.DogTrait memory femaleTrait,
+      DogLib.DogBreedInfo memory maleBreed,
+      DogLib.DogBreedInfo memory femaleBreed,
+      string memory name, 
+      uint256 id) public {
+    require(isBreeding[maleID] == false && isBreeding[femaleID] == false, "Cannot breed!");
+    require((block.timestamp - breedEnded[maleID]) > 5184000 && (block.timestamp - breedEnded[femaleID]) > 5184000, "Cannot breed!");
     require(
-      male.parent0 != female.parent0 && 
-      male.parent1 != female.parent1 &&
-      male.parent1 != female.id && 
-      male.id      != female.parent0,
+      maleBase.parent0 != femaleBase.parent0 && 
+      maleBase.parent1 != femaleBase.parent1 &&
+      maleBase.parent1 != femaleBase.id && 
+      maleBase.id      != femaleBase.parent0,
       "Your dogs can not breed.");
-    DogLib.DogInfo memory offSpring;
-    if(DogLib.chance(50)) offSpring.gender = true;
-    else offSpring.gender = false;
+    isBreeding[maleID] = true;
+    isBreeding[femaleID] = true;
+    breedEnded[maleID] = block.timestamp;
+    breedEnded[femaleID] = block.timestamp;
+    DogLib.DogBreedInfo memory offSpringBreed;
+    DogLib.DogTrait memory offSpringTrait;
+    DogLib.DogBaseInfo memory offSpringBase;
+    if(DogLib.chance(50)) offSpringBase.gender = true;
+    else offSpringBase.gender = false;
 
-    if(DogLib.chance(50)) offSpring.breedSuccessRate = (male.breedSuccessRate+female.breedSuccessRate) / 2 + 2;
+    if(DogLib.chance(50)) offSpringBreed.breedSuccessRate = (maleBreed.breedSuccessRate+femaleBreed.breedSuccessRate) / 2 + 2;
     else {
-      if(DogLib.chance(50)) offSpring.breedSuccessRate = (male.breedSuccessRate+female.breedSuccessRate) / 2;
-      else offSpring.breedSuccessRate = (male.breedSuccessRate+female.breedSuccessRate) / 2 - 2;
+      if(DogLib.chance(50)) offSpringBreed.breedSuccessRate = (maleBreed.breedSuccessRate+femaleBreed.breedSuccessRate) / 2;
+      else offSpringBreed.breedSuccessRate = (maleBreed.breedSuccessRate+femaleBreed.breedSuccessRate) / 2 - 2;
     }
 
-    //offSpring.id = DogNFT.dogs.length;
-    offSpring.parent0 = male.id;
-    offSpring.parent1 = female.id;
-    offSpring.name = name;
-    offSpring.id = id;
+    offSpringBase.parent0 = maleBase.id;
+    offSpringBase.parent1 = femaleBase.id;
+    offSpringBase.name = name;
+    offSpringBase.id = id;
 
-    if(DogLib.chance(50)) offSpring.agility = (male.agility+female.agility) / 2 + 2;
+    if(DogLib.chance(50)) offSpringTrait.agility = (maleTrait.agility+femaleTrait.agility) / 2 + 2;
     else {
-      if(DogLib.chance(50)) offSpring.agility = (male.agility+female.agility) / 2;
-      else offSpring.agility = (male.agility+female.agility) / 2 - 2;
+      if(DogLib.chance(50)) offSpringTrait.agility = (maleTrait.agility+femaleTrait.agility) / 2;
+      else offSpringTrait.agility = (maleTrait.agility+femaleTrait.agility) / 2 - 2;
     }
 
-    if(DogLib.chance(50)) offSpring.agility = (male.agility+female.agility) / 2 - 2;
+    if(DogLib.chance(50)) offSpringTrait.agility = (maleTrait.agility+femaleTrait.agility) / 2 - 2;
     else {
-      if(DogLib.chance(50)) offSpring.agility = (male.agility+female.agility) / 2;
-      else offSpring.agility = (male.agility+female.agility) / 2 + 2;
+      if(DogLib.chance(50)) offSpringTrait.agility = (maleTrait.agility+femaleTrait.agility) / 2;
+      else offSpringTrait.agility = (maleTrait.agility+femaleTrait.agility) / 2 + 2;
     }
 
-    if(DogLib.chance(50)) offSpring.stamina = (male.stamina+female.stamina) / 2 - 2;
+    if(DogLib.chance(50)) offSpringTrait.stamina = (maleTrait.stamina+femaleTrait.stamina) / 2 - 2;
     else {
-      if(DogLib.chance(50)) offSpring.stamina = (male.stamina+female.stamina) / 2;
-      else offSpring.stamina = (male.stamina+female.stamina) / 2 + 2;
+      if(DogLib.chance(50)) offSpringTrait.stamina = (maleTrait.stamina+femaleTrait.stamina) / 2;
+      else offSpringTrait.stamina = (maleTrait.stamina+femaleTrait.stamina) / 2 + 2;
     }
 
-    offSpring.health = 100;
+    offSpringTrait.health = 100;
 
-    if(DogLib.chance(50)) offSpring.luck = (male.luck+female.luck) / 2 - 2;
+    if(DogLib.chance(50)) offSpringTrait.luck = (maleTrait.luck+femaleTrait.luck) / 2 - 2;
     else {
-      if(DogLib.chance(50)) offSpring.luck = (male.luck+female.luck) / 2;
-      else offSpring.luck = (male.luck+female.luck) / 2 + 2;
+      if(DogLib.chance(50)) offSpringTrait.luck = (maleTrait.luck+femaleTrait.luck) / 2;
+      else offSpringTrait.luck = (maleTrait.luck+femaleTrait.luck) / 2 + 2;
     }
 
-    if(DogLib.strcmp(male.breed, female.breed))
-      offSpring.breed = male.breed;
+    if(DogLib.strcmp(maleBreed.breed, femaleBreed.breed))
+      offSpringBreed.breed = maleBreed.breed;
     else 
-      offSpring.breed = "CrossBreed";
-    dog.mint(msg.sender, offSpring);
+      offSpringBreed.breed = "CrossBreed";
+    dog.mint(msg.sender, offSpringTrait, offSpringBase, offSpringBreed);
   }
 }
